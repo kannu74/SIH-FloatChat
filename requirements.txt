@@ -1,0 +1,17 @@
+# For reading NetCDF files
+netCDF4
+xarray
+
+# Data manipulation
+pandas
+
+# PostgreSQL connection
+sqlalchemy
+psycopg2-binary
+
+# Vector Database
+chromadb
+sentence-transformers
+
+# For loading environment variables
+python-dotenv
