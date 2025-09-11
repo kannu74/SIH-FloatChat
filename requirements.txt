@@ -15,3 +15,9 @@ sentence-transformers
 
 # For loading environment variables
 python-dotenv
+
+# Web server for the API
+Flask
+
+# Google Gemini AI
+google-generativeai
