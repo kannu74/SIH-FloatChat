@@ -1,10 +1,15 @@
 import os
 import pandas as pd
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify # We remove render_template from here
 from sqlalchemy import create_engine, text
 from backend.llm.rag_handler import get_sql_from_question
 
-app = Flask(__name__)
+# --- CRITICAL FIX ---
+# This line tells Flask where to find the frontend files from this file's location.
+# It looks two directories up (from backend/api/ to sih/) to find the folders.
+app = Flask(__name__, template_folder='../../templates', static_folder='../../static')
+# --------------------
+
 
 # --- Database Connection ---
 try:
@@ -38,7 +43,7 @@ def chat_handler():
         with engine.connect() as connection:
             df = pd.read_sql(text(sql_query), connection)
             result = df.to_dict(orient='records')
-
+        
         return jsonify({
             "question": question,
             "sql_query": sql_query,

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FloatChat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h1>FloatChat</h1>
+            <div class="sidebar-buttons">
+                <button id="new-chat-btn">➕ New Chat</button>
+                <button id="delete-chat-btn">🗑️ Delete Chat</button>
+            </div>
+            <nav id="chat-history"></nav>
+        </aside>
+
+        <main class="chat-interface">
+            <div id="chat-window">
+                </div>
+            
+            <div id="avatar-container">
+                AVATAR
+            </div>
+
+            <div class="chat-input-area">
+                <form id="chat-form">
+                    <input type="text" id="message-input" placeholder="Ask about ARGO ocean data..." autocomplete="off" required>
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
