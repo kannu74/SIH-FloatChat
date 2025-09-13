@@ -3,6 +3,10 @@ import pandas as pd
 from flask import Flask, request, jsonify
 from sqlalchemy import create_engine, text
 from backend.llm.rag_handler import get_sql_from_question
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # This line correctly configures Flask to find the frontend files
 app = Flask(__name__, template_folder='../../templates', static_folder='../../static')
