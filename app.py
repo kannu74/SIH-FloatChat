@@ -1,12 +1,17 @@
-from flask import render_template
-from backend.api.main import app
+from dotenv import load_dotenv
+# Load environment variables FIRST, before any other imports that might need them.
+load_dotenv()
 
-# This new route will serve the HTML frontend for our chat application.
-# It tells Flask to find 'index.html' in the 'templates' folder.
+from flask import render_template
+# This imports the Flask app object from your API file.
+# That object already contains the /api/chat route.
+from backend.api.main import app 
+
+# This new route serves the main HTML page for your user interface.
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# This block runs the Flask development server.
 if __name__ == '__main__':
-    # The app will now serve both the API and the frontend.
     app.run(debug=True)

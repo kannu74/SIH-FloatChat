@@ -1,4 +1,5 @@
 import os
+import json
 import chromadb
 import google.generativeai as genai
 
@@ -9,66 +10,62 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 DB_SCHEMA = """
 Table Name: argo_measurements
 Columns:
-- id (INTEGER, Primary Key)
 - float_id (VARCHAR)
-- timestamp (TIMESTAMP WITH TIME ZONE)
+- timestamp (TIMESTAMP)
 - latitude (REAL)
 - longitude (REAL)
-- pressure (REAL)
-- temperature (REAL)
+- pressure (REAL) - Ocean depth in decibars.
+- temperature (REAL) - In Celsius.
 - salinity (REAL)
 
 Table Name: argo_floats
 Columns:
-- id (SERIAL, Primary Key)
 - float_id (VARCHAR, Unique)
-- latest_latitude (REAL)
-- latest_longitude (REAL)
 - project_name (VARCHAR)
 """
 
-def get_sql_from_question(question: str) -> str:
+def get_sql_from_question(question: str) -> dict:
     """
-    Uses a RAG pipeline with Gemini to convert a natural language question into a SQL query.
+    Uses a RAG pipeline with Gemini to convert a natural language question 
+    into a JSON object containing a SQL query and a visualization suggestion.
     """
     try:
-        # 1. Retrieve context from ChromaDB
-        client = chromadb.PersistentClient(path="db/chroma_db")
-        collection = client.get_collection(name="argo_float_summaries")
-
-        context_docs = collection.peek(limit=5)
-        context_str = "\n".join(doc for doc in context_docs['documents'])
-
-        # 2. Augment: Construct a detailed prompt for the LLM
+        # This new prompt instructs the LLM to return a structured JSON response
         prompt = f"""
-        You are an expert PostgreSQL assistant. Your task is to convert a user's question about ARGO float data into a valid PostgreSQL query.
+        You are an expert PostgreSQL assistant for ARGO ocean data. Your task is to convert a user's question into a JSON object.
+        This JSON object must contain two keys: "sql_query" and "visualization_type".
 
-        You must only output the SQL query and nothing else. Do not include any explanations or markdown formatting like ```sql.
+        - "sql_query": A valid PostgreSQL query based on the user's question and the provided schema.
+        - "visualization_type": Your suggestion for the best way to visualize the data. 
+          Possible values are: "table", "line_chart", "map".
 
-        Here is the database schema you must use:
+        - Choose "line_chart" for data showing a profile or trend, like temperature vs. pressure (depth). The y-axis should be pressure and inverted to show depth.
+        - Choose "map" if the user asks for float locations or trajectories.
+        - Choose "table" for everything else, like listing names or simple values.
+        
+        You must only output the raw JSON object and nothing else. Do not include markdown formatting like ```json.
+
+        Database Schema:
         {DB_SCHEMA}
-
-        Here is some general context about the data available:
-        {context_str}
 
         User Question: "{question}"
 
-        SQL Query:
+        JSON Output:
         """
 
-        # 3. Generate: Call the Gemini model
         model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
-
-        generated_sql = response.text.strip()
-
-        # Basic cleanup of the generated SQL
-        if "```" in generated_sql:
-            generated_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
-
-        print(f"DEBUG: Generated SQL -> {generated_sql}")
-        return generated_sql
+        
+        # Clean up and parse the JSON response from the LLM
+        response_text = response.text.strip()
+        response_json = json.loads(response_text)
+        
+        print(f"DEBUG: LLM Response JSON -> {response_json}")
+        return response_json
 
     except Exception as e:
         print(f"An error occurred in the RAG handler: {e}")
-        return "SELECT 'An error occurred while generating the SQL query. Please check the logs.';"
+        return {
+            "sql_query": "SELECT 'An error occurred. Please check the logs.';",
+            "visualization_type": "table"
+        }
