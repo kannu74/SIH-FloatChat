@@ -5,10 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const newChatBtn = document.getElementById('new-chat-btn');
     const deleteChatBtn = document.getElementById('delete-chat-btn');
     const chatHistoryEl = document.getElementById('chat-history');
+    const welcomeCard = document.getElementById('welcome-card');
 
     let chatHistory = {};
     let activeChatId = null;
 
+    // --- Core Functions ---
     const loadChats = () => {
         chatHistory = JSON.parse(localStorage.getItem('floatChatHistory')) || {};
         const chatIds = Object.keys(chatHistory);
@@ -57,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // --- Rendering Functions ---
     const renderChatHistory = () => {
         chatHistoryEl.innerHTML = '';
         Object.values(chatHistory).forEach(chat => {
@@ -72,17 +75,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderActiveChat = () => {
         chatWindow.innerHTML = '';
         const activeChat = chatHistory[activeChatId];
-        if (activeChat) {
-            activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
-        }
+        if (activeChat) activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
     };
 
-    function appendMessage(role, messageData) {
+    const appendMessage = (role, messageData) => {
         const messageEl = document.createElement('div');
-        messageEl.classList.add('message', `${role}-message`, 'new-message'); // highlight class
+        messageEl.classList.add('message', `${role}-message`, 'new-message'); // highlight new message
 
-        // remove highlight after a short delay
-        setTimeout(() => messageEl.classList.remove('new-message'), 1200);
+        setTimeout(() => messageEl.classList.remove('new-message'), 1200); // remove highlight
 
         if (messageData.content === 'loading') {
             const indicator = document.createElement('div');
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chatWindow.appendChild(messageEl);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
+    };
 
     const renderResponse = (element, messageData) => {
         const { content, sql_query, visualization } = messageData;
@@ -143,10 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const y_values = data.map(row => row.pressure);
         const x_axis_title = data[0].temperature ? 'Temperature (°C)' : 'Salinity';
 
-        Plotly.newPlot(element, [{
-            x: x_values, y: y_values,
-            mode: 'lines+markers', type: 'scatter'
-        }], {
+        Plotly.newPlot(element, [{ x: x_values, y: y_values, mode: 'lines+markers', type: 'scatter' }], {
             title: `${x_axis_title} Profile`,
             xaxis: { title: x_axis_title, side: 'top' },
             yaxis: { title: 'Pressure (Depth)', autorange: 'reversed' },
@@ -194,9 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             headers.forEach(header => {
                 const td = document.createElement('td');
-                td.textContent = (header === 'timestamp')
-                    ? new Date(rowData[header]).toLocaleString()
-                    : rowData[header];
+                td.textContent = (header === 'timestamp') ? new Date(rowData[header]).toLocaleString() : rowData[header];
                 row.appendChild(td);
             });
             tbody.appendChild(row);
@@ -206,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return table;
     };
 
+    // --- Event Handlers ---
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const question = messageInput.value.trim();
@@ -238,12 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await response.json();
-            const botMessage = {
-                role: 'bot',
-                content: result.data,
-                sql_query: result.sql_query,
-                visualization: result.visualization
-            };
+            const botMessage = { role: 'bot', content: result.data, sql_query: result.sql_query, visualization: result.visualization };
             chatHistory[activeChatId].messages.push(botMessage);
             appendMessage(botMessage.role, botMessage);
 
@@ -259,6 +250,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     newChatBtn.addEventListener('click', startNewChat);
     deleteChatBtn.addEventListener('click', deleteActiveChat);
+
+    // --- Welcome Card Feature ---
+    function toggleWelcomeCard() {
+        const hasMessages = chatWindow.querySelector(".message");
+        welcomeCard.style.display = hasMessages ? "none" : "block";
+    }
+
+    toggleWelcomeCard();
+    const observer = new MutationObserver(toggleWelcomeCard);
+    observer.observe(chatWindow, { childList: true });
 
     loadChats();
 });
