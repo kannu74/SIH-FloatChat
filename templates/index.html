@@ -1,39 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FloatChat</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloatChat</title>
+
+  <!-- Main Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- CRITICAL FIX: Add the Plotly.js library script -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <aside class="sidebar">
-            <h1>FloatChat</h1>
-            <div class="sidebar-buttons">
-                <button id="new-chat-btn">➕ New Chat</button>
-                <button id="delete-chat-btn">🗑️ Delete Chat</button>
-            </div>
-            <nav id="chat-history"></nav>
-        </aside>
+  <div class="container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h1><i class="fa fa-comments"></i> FloatChat</h1>
 
-        <main class="chat-interface">
-            <div id="chat-window">
-                </div>
-            
-            <div id="avatar-container">
-                AVATAR
-            </div>
+      <div class="sidebar-buttons">
+        <button id="new-chat-btn"><i class="fa fa-plus"></i> New Chat</button>
+        <button id="delete-chat-btn"><i class="fa fa-trash"></i> Delete Chat</button>
+      </div>
 
-            <div class="chat-input-area">
-                <form id="chat-form">
-                    <input type="text" id="message-input" placeholder="Ask about ARGO ocean data..." autocomplete="off" required>
-                    <button type="submit">Send</button>
-                </form>
-            </div>
-        </main>
-    </div>
+      <nav id="chat-history"></nav>
+    </aside>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Chat Interface -->
+    <main class="chat-interface">
+      <!-- Welcome card (visible until first message) -->
+      <div id="welcome-card">
+        <h2>Welcome to FloatChat AI</h2>
+        <p>
+          Click <strong>New Chat</strong> or type your question below
+          to explore ARGO ocean data.
+        </p>
+      </div>
+
+      <!-- Chat window -->
+      <div id="chat-window"></div>
+
+      <!-- Avatar -->
+      <div id="avatar-container">AVATAR</div>
+
+      <!-- Chat Input -->
+      <div class="chat-input-area">
+        <form id="chat-form">
+          <input
+            type="text"
+            id="message-input"
+            placeholder="Ask about ARGO ocean data..."
+            autocomplete="off"
+            required
+          />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Your custom JavaScript files -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
 </body>
 </html>
+

@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const newChatBtn = document.getElementById('new-chat-btn');
     const deleteChatBtn = document.getElementById('delete-chat-btn');
     const chatHistoryEl = document.getElementById('chat-history');
+    const welcomeCard = document.getElementById('welcome-card');
 
     let chatHistory = {};
     let activeChatId = null;
@@ -88,11 +89,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (activeChat) {
             activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
         }
+        toggleWelcomeCard();
     };
 
     const appendMessage = (role, messageData) => {
         const messageEl = document.createElement('div');
-        messageEl.classList.add('message', `${role}-message`);
+        messageEl.classList.add('message', `${role}-message`, 'new-message');
+        setTimeout(() => messageEl.classList.remove('new-message'), 1200);
 
         if (messageData.content === 'loading') {
             const indicator = document.createElement('div');
@@ -117,13 +120,15 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (Array.isArray(content) && content.length > 0) {
             const plotContainer = document.createElement('div');
-            // This switch statement decides what to render
             switch (visualization) {
                 case 'line_chart':
                     renderLineChart(plotContainer, content);
                     break;
                 case 'map':
                     renderMap(plotContainer, content);
+                    break;
+                case 'scatter_plot':
+                    renderScatterPlot(plotContainer, content);
                     break;
                 case 'table':
                 default:
@@ -134,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (Array.isArray(content) && content.length === 0) {
             element.textContent = "Query returned no results.";
         } else {
-            element.textContent = content; // For error messages or simple text
+            element.textContent = content;
         }
 
         if (sql_query) {
@@ -149,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- NEW Visualization and Table Functions ---
+    // --- Visualization and Table Functions ---
 
     const renderLineChart = (element, data) => {
         const x_values = data.map(row => row.temperature ?? row.salinity);
@@ -159,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
         Plotly.newPlot(element, [{ x: x_values, y: y_values, mode: 'lines+markers', type: 'scatter' }], {
             title: `${x_axis_title} Profile`,
             xaxis: { title: x_axis_title, side: 'top' },
-            yaxis: { title: 'Pressure (Depth)', autorange: 'reversed' }, // Inverted Y-axis for depth
+            yaxis: { title: 'Pressure (Depth)', autorange: 'reversed' },
             paper_bgcolor: '#2a2a2a', plot_bgcolor: '#2a2a2a', font: { color: '#e0e0e0' }
         });
     };
@@ -174,6 +179,39 @@ document.addEventListener('DOMContentLoaded', () => {
             bgcolor: '#2a2a2a', landcolor: '#3a3a3a', subunitcolor: '#555' },
             paper_bgcolor: '#2a2a2a', plot_bgcolor: '#2a2a2a', font: { color: '#e0e0e0' }
         });
+    };
+
+    // --- Find and replace this specific function in your main.js file ---
+    const renderScatterPlot = (element, data) => {
+        // Add a check to ensure the required data columns are present
+        if (!data[0].salinity || !data[0].temperature || !data[0].pressure) {
+            element.textContent = "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
+            return;
+        }
+
+        const plotData = [{
+            x: data.map(row => row.salinity),
+            y: data.map(row => row.temperature),
+            mode: 'markers',
+            type: 'scatter',
+            marker: {
+                color: data.map(row => row.pressure),
+                colorscale: 'Viridis',
+                showscale: true,
+                colorbar: {
+                    title: 'Pressure (Depth)'
+                }
+            }
+        }];
+        const layout = {
+            title: 'Temperature vs. Salinity (T-S Diagram)',
+            xaxis: { title: 'Salinity' },
+            yaxis: { title: 'Temperature (°C)' },
+            paper_bgcolor: '#2a2a2a',
+            plot_bgcolor: '#2a2a2a',
+            font: { color: '#e0e0e0' }
+        };
+        Plotly.newPlot(element, plotData, layout);
     };
 
     const createTable = (data) => {
@@ -202,8 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return table;
     };
 
-    // --- Event Handlers (No major changes, just ensure it passes the full response) ---
-
+    // --- Event Handlers ---
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const question = messageInput.value.trim();
@@ -228,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ question: question })
             });
 
-            chatWindow.removeChild(chatWindow.lastChild); // Remove loader
+            chatWindow.removeChild(chatWindow.lastChild);
 
             if (!response.ok) {
                 const err = await response.json();
@@ -236,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await response.json();
-            // The bot message now includes the visualization key
             const botMessage = { role: 'bot', content: result.data, sql_query: result.sql_query, visualization: result.visualization };
             chatHistory[activeChatId].messages.push(botMessage);
             appendMessage(botMessage.role, botMessage);
@@ -253,6 +289,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     newChatBtn.addEventListener('click', startNewChat);
     deleteChatBtn.addEventListener('click', deleteActiveChat);
+
+    // --- Welcome Card Feature ---
+    function toggleWelcomeCard() {
+        const hasMessages = chatWindow.querySelector(".message");
+        if (welcomeCard) {
+            welcomeCard.style.display = hasMessages ? "none" : "flex";
+        }
+    }
+
+    const observer = new MutationObserver(toggleWelcomeCard);
+    observer.observe(chatWindow, { childList: true });
 
     // --- Initial Load ---
     loadChats();
