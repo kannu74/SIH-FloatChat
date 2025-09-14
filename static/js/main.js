@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeChatId = null;
 
     // --- Core Functions for Chat Management ---
-
     const loadChats = () => {
         chatHistory = JSON.parse(localStorage.getItem('floatChatHistory')) || {};
         const chatIds = Object.keys(chatHistory);
@@ -32,20 +31,16 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('floatChatHistory', JSON.stringify(chatHistory));
         localStorage.setItem('floatChatActiveId', activeChatId);
     };
-    
+
     const startNewChat = () => {
         const newChatId = `chat_${Date.now()}`;
-        chatHistory[newChatId] = {
-            id: newChatId,
-            title: 'New Chat',
-            messages: []
-        };
+        chatHistory[newChatId] = { id: newChatId, title: 'New Chat', messages: [] };
         activeChatId = newChatId;
         renderChatHistory();
         renderActiveChat();
         saveChats();
     };
-    
+
     const switchChat = (chatId) => {
         activeChatId = chatId;
         renderChatHistory();
@@ -68,34 +63,38 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Rendering Functions to Display Content ---
-
     const renderChatHistory = () => {
         chatHistoryEl.innerHTML = '';
         Object.values(chatHistory).forEach(chat => {
             const sessionEl = document.createElement('div');
             sessionEl.classList.add('chat-session');
-            if (chat.id === activeChatId) {
-                sessionEl.classList.add('active');
-            }
+            if (chat.id === activeChatId) sessionEl.classList.add('active');
             sessionEl.textContent = chat.title;
             sessionEl.addEventListener('click', () => switchChat(chat.id));
             chatHistoryEl.appendChild(sessionEl);
         });
     };
-    
+
     const renderActiveChat = () => {
-        chatWindow.innerHTML = '';
+        chatWindow.innerHTML = ''; // Clear previous messages
+        
+        // Put the welcome card back if needed
+        chatWindow.appendChild(welcomeCard);
+
         const activeChat = chatHistory[activeChatId];
         if (activeChat) {
-            activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
+            activeChat.messages.forEach(msg => appendMessage(msg.role, msg, false)); // false = don't animate old messages
         }
         toggleWelcomeCard();
     };
 
-    const appendMessage = (role, messageData) => {
+    const appendMessage = (role, messageData, animate = true) => {
         const messageEl = document.createElement('div');
-        messageEl.classList.add('message', `${role}-message`, 'new-message');
-        setTimeout(() => messageEl.classList.remove('new-message'), 1200);
+        messageEl.classList.add('message', `${role}-message`);
+        if (animate) {
+            messageEl.classList.add('new-message');
+            setTimeout(() => messageEl.classList.remove('new-message'), 1200);
+        }
 
         if (messageData.content === 'loading') {
             const indicator = document.createElement('div');
@@ -110,30 +109,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             renderResponse(messageEl, messageData);
         }
-        
+
         chatWindow.appendChild(messageEl);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        toggleWelcomeCard();
     };
-    
+
     const renderResponse = (element, messageData) => {
         const { content, sql_query, visualization } = messageData;
         
-        if (Array.isArray(content) && content.length > 0) {
+        if (visualization === 'text') {
+            element.textContent = content;
+        } else if (Array.isArray(content) && content.length > 0) {
             const plotContainer = document.createElement('div');
             switch (visualization) {
-                case 'line_chart':
-                    renderLineChart(plotContainer, content);
-                    break;
-                case 'map':
-                    renderMap(plotContainer, content);
-                    break;
-                case 'scatter_plot':
-                    renderScatterPlot(plotContainer, content);
-                    break;
-                case 'table':
-                default:
-                    plotContainer.appendChild(createTable(content));
-                    break;
+                case 'line_chart': renderLineChart(plotContainer, content); break;
+                case 'map': renderMap(plotContainer, content); break;
+                case 'scatter_plot': renderScatterPlot(plotContainer, content); break;
+                default: plotContainer.appendChild(createTable(content)); break;
             }
             element.appendChild(plotContainer);
         } else if (Array.isArray(content) && content.length === 0) {
@@ -155,12 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Visualization and Table Functions ---
-
     const renderLineChart = (element, data) => {
         const x_values = data.map(row => row.temperature ?? row.salinity);
         const y_values = data.map(row => row.pressure);
         const x_axis_title = data[0].temperature ? 'Temperature (°C)' : 'Salinity';
-        
         Plotly.newPlot(element, [{ x: x_values, y: y_values, mode: 'lines+markers', type: 'scatter' }], {
             title: `${x_axis_title} Profile`,
             xaxis: { title: x_axis_title, side: 'top' },
@@ -181,35 +172,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- Find and replace this specific function in your main.js file ---
     const renderScatterPlot = (element, data) => {
-        // Add a check to ensure the required data columns are present
         if (!data[0].salinity || !data[0].temperature || !data[0].pressure) {
             element.textContent = "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
             return;
         }
-
         const plotData = [{
             x: data.map(row => row.salinity),
             y: data.map(row => row.temperature),
-            mode: 'markers',
-            type: 'scatter',
-            marker: {
-                color: data.map(row => row.pressure),
-                colorscale: 'Viridis',
-                showscale: true,
-                colorbar: {
-                    title: 'Pressure (Depth)'
-                }
-            }
+            mode: 'markers', type: 'scatter',
+            marker: { color: data.map(row => row.pressure), colorscale: 'Viridis', showscale: true, colorbar: { title: 'Pressure (Depth)' } }
         }];
         const layout = {
             title: 'Temperature vs. Salinity (T-S Diagram)',
-            xaxis: { title: 'Salinity' },
-            yaxis: { title: 'Temperature (°C)' },
-            paper_bgcolor: '#2a2a2a',
-            plot_bgcolor: '#2a2a2a',
-            font: { color: '#e0e0e0' }
+            xaxis: { title: 'Salinity' }, yaxis: { title: 'Temperature (°C)' },
+            paper_bgcolor: '#2a2a2a', plot_bgcolor: '#2a2a2a', font: { color: '#e0e0e0' }
         };
         Plotly.newPlot(element, plotData, layout);
     };
@@ -258,32 +235,32 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.value = '';
         appendMessage('bot', { content: 'loading' });
 
+        const historyForApi = chatHistory[activeChatId].messages.slice(0, -1).map(msg => {
+            let content = (typeof msg.content === 'string') ? msg.content : 'User asked for a visualization.';
+            return { role: msg.role, content: content };
+        });
+
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: question })
+                body: JSON.stringify({ question: question, chat_history: historyForApi })
             });
-
             chatWindow.removeChild(chatWindow.lastChild);
-
             if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.error || `HTTP error! status: ${response.status}`);
             }
-
             const result = await response.json();
             const botMessage = { role: 'bot', content: result.data, sql_query: result.sql_query, visualization: result.visualization };
             chatHistory[activeChatId].messages.push(botMessage);
             appendMessage(botMessage.role, botMessage);
-            
         } catch (error) {
             console.error('Error fetching from API:', error);
             const errorMessage = { role: 'bot', content: `Error: ${error.message}` };
             chatHistory[activeChatId].messages.push(errorMessage);
             appendMessage(errorMessage.role, errorMessage);
         }
-
         saveChats();
     });
 
@@ -292,13 +269,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Welcome Card Feature ---
     function toggleWelcomeCard() {
+        // Checks if there are any message elements (excluding the welcome card itself)
         const hasMessages = chatWindow.querySelector(".message");
         if (welcomeCard) {
             welcomeCard.style.display = hasMessages ? "none" : "flex";
         }
     }
 
-    const observer = new MutationObserver(toggleWelcomeCard);
+    // This makes sure the welcome card is shown or hidden when messages are added or removed
+    const observer = new MutationObserver(() => {
+        // We need a small delay to let the DOM update after clearing
+        setTimeout(toggleWelcomeCard, 0);
+    });
     observer.observe(chatWindow, { childList: true });
 
     // --- Initial Load ---
