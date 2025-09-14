@@ -22,13 +22,17 @@ body {
 }
 
 .sidebar {
-    width: 250px;
-    background-color: #1e1e1e;
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid #333;
+  width: 260px;
+  flex-shrink: 0;      /* ✅ prevent sidebar from shrinking */
+  background: linear-gradient(180deg, #08131e 0%, #050c14 100%);
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0, 150, 255, 0.15);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
+
 
 .sidebar h1 {
     font-size: 1.5rem;
@@ -386,7 +390,11 @@ body {
   padding: 40px 60px;
   text-align: center;
   box-shadow: 0 0 30px rgba(0, 150, 255, 0.2);
-  display: none; /* hidden by default, shown via JS */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* hidden by default, shown via JS */
   max-width: 500px;
 }
 #welcome-card h2 {
