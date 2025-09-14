@@ -18,7 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
             startNewChat();
         } else {
             activeChatId = localStorage.getItem('floatChatActiveId') || chatIds[chatIds.length - 1];
+
             if (!chatHistory[activeChatId]) activeChatId = chatIds[chatIds.length - 1];
+
+            if (!chatHistory[activeChatId]) {
+                activeChatId = chatIds[chatIds.length - 1];
+            }
+
             renderChatHistory();
             renderActiveChat();
         }
@@ -75,7 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderActiveChat = () => {
         chatWindow.innerHTML = '';
         const activeChat = chatHistory[activeChatId];
+
         if (activeChat) activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
+
+        if (activeChat) {
+            activeChat.messages.forEach(msg => appendMessage(msg.role, msg));
+        }
+
     };
 
     const appendMessage = (role, messageData) => {
@@ -102,11 +114,21 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
     };
 
+
     const renderResponse = (element, messageData) => {
         const { content, sql_query, visualization } = messageData;
 
         if (Array.isArray(content) && content.length > 0) {
             const plotContainer = document.createElement('div');
+
+    
+    const renderResponse = (element, messageData) => {
+        const { content, sql_query, visualization } = messageData;
+        
+        if (Array.isArray(content) && content.length > 0) {
+            const plotContainer = document.createElement('div');
+            // This switch statement decides what to render
+
             switch (visualization) {
                 case 'line_chart':
                     renderLineChart(plotContainer, content);
@@ -123,7 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (Array.isArray(content) && content.length === 0) {
             element.textContent = "Query returned no results.";
         } else {
+
             element.textContent = content;
+
+            element.textContent = content; // For error messages or simple text
+
         }
 
         if (sql_query) {
@@ -138,6 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+
+    // --- NEW Visualization and Table Functions ---
+
+
     const renderLineChart = (element, data) => {
         const x_values = data.map(row => row.temperature ?? row.salinity);
         const y_values = data.map(row => row.pressure);
@@ -150,6 +180,13 @@ document.addEventListener('DOMContentLoaded', () => {
             paper_bgcolor: '#2a2a2a',
             plot_bgcolor: '#2a2a2a',
             font: { color: '#e0e0e0' }
+
+        
+        Plotly.newPlot(element, [{ x: x_values, y: y_values, mode: 'lines+markers', type: 'scatter' }], {
+            title: `${x_axis_title} Profile`,
+            xaxis: { title: x_axis_title, side: 'top' },
+            yaxis: { title: 'Pressure (Depth)', autorange: 'reversed' }, // Inverted Y-axis for depth
+            paper_bgcolor: '#2a2a2a', plot_bgcolor: '#2a2a2a', font: { color: '#e0e0e0' }
         });
     };
 
@@ -172,6 +209,14 @@ document.addEventListener('DOMContentLoaded', () => {
             paper_bgcolor: '#2a2a2a',
             plot_bgcolor: '#2a2a2a',
             font: { color: '#e0e0e0' }
+
+            type: 'scattergeo', lon: data.map(r => r.longitude), lat: data.map(r => r.latitude),
+            text: data.map(r => `Float ID: ${r.float_id || ''}`), mode: 'markers',
+            marker: { size: 8, color: 'cyan' }
+        }], {
+            title: 'Float Locations', geo: { projection: { type: 'natural earth' },
+            bgcolor: '#2a2a2a', landcolor: '#3a3a3a', subunitcolor: '#555' },
+            paper_bgcolor: '#2a2a2a', plot_bgcolor: '#2a2a2a', font: { color: '#e0e0e0' }
         });
     };
 
@@ -202,6 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Event Handlers ---
+    // --- Event Handlers (No major changes, just ensure it passes the full response) ---
+
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const question = messageInput.value.trim();
@@ -226,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ question })
             });
 
-            chatWindow.removeChild(chatWindow.lastChild);
+            chatWindow.removeChild(chatWindow.lastChild); // Remove loader
 
             if (!response.ok) {
                 const err = await response.json();
@@ -238,6 +285,11 @@ document.addEventListener('DOMContentLoaded', () => {
             chatHistory[activeChatId].messages.push(botMessage);
             appendMessage(botMessage.role, botMessage);
 
+            // The bot message now includes the visualization key
+            const botMessage = { role: 'bot', content: result.data, sql_query: result.sql_query, visualization: result.visualization };
+            chatHistory[activeChatId].messages.push(botMessage);
+            appendMessage(botMessage.role, botMessage);
+            
         } catch (error) {
             console.error('Error fetching from API:', error);
             const errorMessage = { role: 'bot', content: `Error: ${error.message}` };
@@ -260,6 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleWelcomeCard();
     const observer = new MutationObserver(toggleWelcomeCard);
     observer.observe(chatWindow, { childList: true });
+
 
     loadChats();
 });
