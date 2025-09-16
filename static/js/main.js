@@ -104,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const loader = document.createElement("div");
       loader.classList.add("loader");
       const text = document.createElement("span");
-      text.textContent = "FloatChat is thinking...";
+      text.textContent = "Orca AI is thinking...";
       indicator.appendChild(loader);
       indicator.appendChild(text);
       messageEl.appendChild(indicator);
