@@ -134,6 +134,15 @@ document.addEventListener("DOMContentLoaded", () => {
         case "scatter_plot":
           renderScatterPlot(plotContainer, content);
           break;
+        case 'bar_chart':
+          renderBarChart(plotContainer, content); 
+          break;
+        case 'histogram':
+          renderHistogram(plotContainer, content);
+          break;
+        case 'time_series':
+          renderTimeSeries(plotContainer, content);
+          break;
         default:
           plotContainer.appendChild(createTable(content));
           break;
@@ -158,6 +167,89 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // --- Visualization and Table Functions ---
+  const renderBarChart = (element, data) => {
+    // Intelligently find which column has text and which has numbers
+    let categoryKey = '';
+    let valueKey = '';
+    for (const key in data[0]) {
+        if (typeof data[0][key] === 'string') {
+            categoryKey = key;
+        } else if (typeof data[0][key] === 'number') {
+            valueKey = key;
+        }
+    }
+
+    // If we couldn't find the keys, exit gracefully
+    if (!categoryKey || !valueKey) {
+        element.textContent = "Could not render bar chart due to unexpected data format.";
+        return;
+    }
+
+    const categories = data.map(row => row[categoryKey]);
+    const values = data.map(row => row[valueKey]);
+
+    Plotly.newPlot(element, [{
+        x: categories, // Text labels on the x-axis
+        y: values,     // Numerical values on the y-axis
+        type: 'bar',
+        marker: { color: 'cyan' }
+    }], {
+        title: `Count of Measurements per Project`, // Updated title
+        xaxis: { 
+            title: 'Project Name',
+            tickangle: -45 // Rotate labels to prevent overlap
+        },
+        yaxis: { title: 'Number of Measurements' },
+        margin: { b: 150 }, // Add bottom margin for rotated labels
+        paper_bgcolor: '#2a2a2a',
+        plot_bgcolor: '#2a2a2a',
+        font: { color: '#e0e0e0' }
+    });
+};
+    const renderHistogram = (element, data) => {
+    const key = Object.keys(data[0])[0];
+    const values = data.map(row => row[key]);
+
+    Plotly.newPlot(element, [{
+        x: values,
+        type: 'histogram',
+        marker: { 
+            color: 'cyan',
+            // Add a line to create a border around each bar
+            line: {
+                color: '#121212', // A dark color matching the background
+                width: 1
+            }
+        }
+    }], {
+        title: `Distribution of ${key}`,
+        xaxis: { title: key },
+        yaxis: { title: 'Frequency' },
+        paper_bgcolor: '#2a2a2a',
+        plot_bgcolor: '#2a2a2a',
+        font: { color: '#e0e0e0' }
+    });
+};
+    const renderTimeSeries = (element, data) => {
+        // Assumes data has 'timestamp' and one other measurement key
+        const valueKey = Object.keys(data[0]).find(k => k !== 'timestamp');
+        const timestamps = data.map(row => row.timestamp);
+        const values = data.map(row => row[valueKey]);
+
+        Plotly.newPlot(element, [{
+            x: timestamps,
+            y: values,
+            mode: 'lines+markers',
+            type: 'scatter'
+        }], {
+            title: `Trend of ${valueKey} Over Time`,
+            xaxis: { title: 'Timestamp' },
+            yaxis: { title: valueKey },
+            paper_bgcolor: '#2a2a2a',
+            plot_bgcolor: '#2a2a2a',
+            font: { color: '#e0e0e0' }
+        });
+    };
   const renderLineChart = (element, data) => {
     const x_values = data.map((row) => row.temperature ?? row.salinity);
     const y_values = data.map((row) => row.pressure);
