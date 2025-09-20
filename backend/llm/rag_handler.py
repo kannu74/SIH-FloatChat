@@ -44,7 +44,7 @@ def handle_question(question: str, chat_history: list) -> dict:
     - For any visualization query ("map", "line_chart", "scatter_plot"), YOU MUST add a "LIMIT 1500" to the SQL query.
     - A 'map' query MUST select 'latitude', 'longitude', AND 'float_id'.
     - A 'line_chart' is ONLY for plots involving 'pressure' or 'depth'.
-    - A 'scatter_plot' is ONLY for 'temperature vs salinity' or 'T-S diagram' requests.
+    - A 'scatter_plot' is ONLY for 'temperature vs salinity' or 'T-S diagram' requests. The SQL query for a scatter_plot MUST select all three columns: temperature, salinity, AND pressure.
     - Always respond with only the raw JSON object and nothing else.
 
     --- CONVERSATION HISTORY ---
@@ -82,3 +82,4 @@ def handle_question(question: str, chat_history: list) -> dict:
             "response_type": "text",
             "answer": "I'm sorry, I encountered an issue processing your request. Please try rephrasing."
         }
+

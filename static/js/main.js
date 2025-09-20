@@ -204,37 +204,38 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   };
 
-  const renderScatterPlot = (element, data) => {
-    if (!data[0].salinity || !data[0].temperature || !data[0].pressure) {
-      element.textContent =
-        "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
-      return;
+  // Find and replace this specific function in your main.js file
+const renderScatterPlot = (element, data) => {
+    // --- CORRECTED, MORE ROBUST CHECK ---
+    // This now checks if the keys exist, which works even if the value is 0.
+    if (!('salinity' in data[0]) || !('temperature' in data[0]) || !('pressure' in data[0])) {
+        element.textContent = "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
+        return;
     }
-    const plotData = [
-      {
+    // ------------------------------------
+
+    const plotData = [{
         x: data.map((row) => row.salinity),
         y: data.map((row) => row.temperature),
-        mode: "markers",
-        type: "scatter",
+        mode: 'markers',
+        type: 'scatter',
         marker: {
-          color: data.map((row) => row.pressure),
-          colorscale: "Viridis",
-          showscale: true,
-          colorbar: { title: "Pressure (Depth)" },
+            color: data.map((row) => row.pressure),
+            colorscale: 'Viridis',
+            showscale: true,
+            colorbar: { title: 'Pressure (Depth)' },
         },
-      },
-    ];
+    }];
     const layout = {
-      title: "Temperature vs. Salinity (T-S Diagram)",
-      xaxis: { title: "Salinity" },
-      yaxis: { title: "Temperature (°C)" },
-      paper_bgcolor: "#2a2a2a",
-      plot_bgcolor: "#2a2a2a",
-      font: { color: "#e0e0e0" },
+        title: 'Temperature vs. Salinity (T-S Diagram)',
+        xaxis: { title: 'Salinity' },
+        yaxis: { title: 'Temperature (°C)' },
+        paper_bgcolor: '#2a2a2a',
+        plot_bgcolor: '#2a2a2a',
+        font: { color: '#e0e0e0' },
     };
     Plotly.newPlot(element, plotData, layout);
-  };
-
+};
   const createTable = (data) => {
     const table = document.createElement("table");
     const thead = document.createElement("thead");
