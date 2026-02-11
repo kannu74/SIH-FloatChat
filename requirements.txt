@@ -22,3 +22,5 @@ uvicorn[standard]
 
 # Google Gemini AI
 google-generativeai
+langgraph 
+langchain-ollama

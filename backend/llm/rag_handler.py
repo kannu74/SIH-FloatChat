@@ -1,85 +1,124 @@
-import os
 import json
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import operator
+from typing import Annotated, TypedDict, Union, List
 
-# Configure the Gemini API key
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+from langchain_ollama import ChatOllama
+from langgraph.graph import StateGraph, END
+
+# 1. Configuration - Optimized for RTX 4050
+# We use a low temperature for SQL and a slightly higher one for Chat
+llm = ChatOllama(model="qwen2.5-coder:7b", temperature=0)
+
+# 2. Define the State
+class AgentState(TypedDict):
+    question: str
+    chat_history: List[dict]
+    intent: str # 'chat' or 'database'
+    response: dict
+    sql_query: str
 
 DB_SCHEMA = """
-Table Name: argo_measurements (stores individual sensor readings)
-Columns:
-- float_id (VARCHAR), timestamp (TIMESTAMP), latitude (REAL), longitude (REAL)
-- pressure (REAL) - Ocean depth., temperature (REAL) - In Celsius., salinity (REAL)
-Table Name: argo_floats (stores metadata for each float)
-Columns:
-- float_id (VARCHAR, Unique), project_name (VARCHAR)
+Table Name: argo_measurements
+Columns: float_id, timestamp, latitude, longitude, pressure (depth), temperature, salinity
+Table Name: argo_floats
+Columns: float_id, project_name
 """
 
-def handle_question(question: str, chat_history: list) -> dict:
-    """
-    Handles all user questions with a single, powerful LLM call.
-    The model decides whether to query the database, answer from knowledge, or give a greeting.
-    """
-    formatted_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in chat_history])
+# --- NODES ---
 
-    # This prompt is updated with instructions for the new chart types
-    prompt = f"""
-    You are Orca AI, a friendly and expert AI assistant for ARGO ocean data.
-    Your task is to analyze the user's latest question and respond with a JSON object.
+def intent_router(state: AgentState):
+    """Classifies the user intent to prevent model confusion."""
+    prompt = f"""Analyze the user question and classify it as 'CHAT' (greeting, general talk) or 'DATABASE' (requesting maps, charts, or specific data).
+    Question: {state['question']}
+    Respond with ONLY the word 'CHAT' or 'DATABASE'."""
     
-    1.  **If the user asks a greeting or simple conversational question**:
-        The JSON output must be: {{"response_type": "text", "answer": "Hello! I am Orca AI. How can I help?"}}
+    classification = llm.invoke(prompt).content.strip().upper()
+    # Handle cases where model adds extra text
+    intent = "database" if "DATABASE" in classification else "chat"
+    return {"intent": intent}
 
-    2.  **If the user asks a general knowledge question**:
-        The JSON output must be: {{"response_type": "text", "answer": "An ARGO float is..."}}
-
-    3.  **If the user asks for data from the database**:
-        The JSON output must be: {{"response_type": "database", "sql_query": "SELECT ...", "visualization_type": "..."}}
-
-    --- RULES for Database Queries ---
-    - Possible visualization types are: "table", "map", "line_chart", "scatter_plot", "bar_chart", "histogram", "time_series".
-    - A 'map' query MUST select 'latitude', 'longitude', AND 'float_id'. LIMIT to 1500 points.
-    - A 'line_chart' is ONLY for plots involving 'pressure' or 'depth'. LIMIT to 1500 points.
-    - A 'scatter_plot' is ONLY for 'temperature vs salinity' requests and MUST select temperature, salinity, AND pressure. LIMIT to 1500 points.
-    - A 'bar_chart' is for comparing counts across categories (e.g., 'count of floats per project').
-    - A 'histogram' is for showing the 'distribution' of a single variable. LIMIT to 5000 points.
-    - A 'time_series' is for tracking a variable 'over time' for a specific float_id. The SQL query MUST select 'timestamp' and the requested variable.
-    - Always respond with only the raw JSON object.
-
-    --- CONVERSATION HISTORY ---
-    {formatted_history}
-    ---
+def chat_node(state: AgentState):
+    """Handles conversational responses with the Orca AI personality."""
+    prompt = f"""You are Orca AI, a friendly oceanography expert. 
+    History: {state['chat_history'][-2:] if state['chat_history'] else 'None'}
+    User: {state['question']}
+    Respond naturally and briefly.
+    Format: {{"response_type": "text", "answer": "your_response"}}"""
     
-    DATABASE SCHEMA:
-    {DB_SCHEMA}
-    ---
-
-    LATEST USER QUESTION: "{question}"
-
-    JSON RESPONSE:
-    """
-    
+    response = llm.invoke(prompt)
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
-        }
-        response = model.generate_content(prompt, safety_settings=safety_settings)
+        clean_json = json.loads(response.content.strip())
+    except:
+        clean_json = {"response_type": "text", "answer": response.content}
+    return {"response": clean_json}
 
-        response_text = response.text.strip().replace("```json", "").replace("```", "")
-        if not response_text:
-            raise ValueError("Model returned an empty response.")
-            
-        print(f"DEBUG: Raw LLM Response -> {response_text}")
-        response_json = json.loads(response_text)
-        return response_json
+def database_node(state: AgentState):
+    """Specialized SQL Engineer node."""
+    prompt = f"""You are a SQL expert for ARGO ocean data.
+    Schema: {DB_SCHEMA}
+    Task: Generate a PostgreSQL query and select a visualization.
+    User Question: {state['question']}
+    
+    Rules:
+    - ALWAYS add 'LIMIT 1500'.
+    - visualization_type options: 'map', 'line_chart', 'scatter_plot', 'table'.
+    - Output ONLY valid JSON:
+    {{"response_type": "database", "sql_query": "SELECT...", "visualization_type": "..."}}"""
+    
+    response = llm.invoke(prompt)
+    content = response.content.strip()
+    
+    # Cleaning Ollama markdown backticks
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0].strip()
+        
+    try:
+        clean_json = json.loads(content)
+    except:
+        clean_json = {"response_type": "text", "answer": "I understood the data request but failed to format the JSON. Try asking again."}
+    
+    return {"response": clean_json}
 
-    except Exception as e:
-        print(f"An error occurred in the RAG handler: {e}")
-        return {
-            "response_type": "text",
-            "answer": "I'm sorry, I encountered an issue processing your request. Please try rephrasing."
-        }
+# --- GRAPH CONSTRUCTION ---
 
+workflow = StateGraph(AgentState)
+
+# Add Nodes
+workflow.add_node("classify_intent", intent_router)
+workflow.add_node("handle_chat", chat_node)
+workflow.add_node("handle_db", database_node)
+
+# Set Entry Point
+workflow.set_entry_point("classify_intent")
+
+# Add Conditional Edges
+workflow.add_conditional_edges(
+    "classify_intent",
+    lambda x: x["intent"],
+    {
+        "chat": "handle_chat",
+        "database": "handle_db"
+    }
+)
+
+# Set End Points
+workflow.add_edge("handle_chat", END)
+workflow.add_edge("handle_db", END)
+
+# Compile
+app = workflow.compile()
+
+def handle_question(question: str, chat_history: list) -> dict:
+    """The entry point called by your Flask API."""
+    inputs = {
+        "question": question,
+        "chat_history": chat_history,
+        "intent": "",
+        "response": {},
+        "sql_query": ""
+    }
+    
+    result = app.invoke(inputs)
+    return result["response"]
