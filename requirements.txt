@@ -17,7 +17,8 @@ sentence-transformers
 python-dotenv
 
 # Web server for the API
-Flask
+fastapi
+uvicorn[standard]
 
 # Google Gemini AI
 google-generativeai
