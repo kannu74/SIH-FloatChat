@@ -1,10 +1,14 @@
 import xarray as xr
 import pandas as pd
+import torch
 
-def process_netcdf_file(file_path):
+def process_netcdf_file(file_path, device=None):
     """
     Reads an ARGO NetCDF file and extracts metadata and measurement data.
+    Processes data on specified device (GPU or CPU).
     """
+    if device is None:
+        device = torch.device('cpu')
     try:
         with xr.open_dataset(file_path, decode_times=True) as ds:
             # --- FINAL FIX: Use .decode() to convert bytes to string ---

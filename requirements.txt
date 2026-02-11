@@ -13,6 +13,9 @@ psycopg2-binary
 chromadb
 sentence-transformers
 
+# GPU/CUDA support (PyTorch)
+torch
+
 # For loading environment variables
 python-dotenv
 

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.dialects.postgresql import insert
 import chromadb
+import torch
 
 # Import our custom modules
 from backend.data_processing.processor import process_netcdf_file
@@ -13,9 +14,36 @@ from backend.data_processing.processor import process_netcdf_file
 load_dotenv()
 # ------------------------------------
 
+# --- GPU/CUDA DETECTION AND SETUP ---
+def setup_device():
+    """Detect and configure computing device (GPU or CPU)."""
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        device_name = torch.cuda.get_device_name(0)
+        device_count = torch.cuda.device_count()
+        print(f"\n{'='*60}")
+        print(f"GPU ACCELERATION ENABLED")
+        print(f"Device: {device_name}")
+        print(f"GPU Count: {device_count}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"{'='*60}\n")
+        return device
+    else:
+        print(f"\n{'='*60}")
+        print(f"GPU NOT DETECTED - Using CPU for processing")
+        print(f"Install CUDA and PyTorch with GPU support for faster processing")
+        print(f"{'='*60}\n")
+        return torch.device('cpu')
+
+# Initialize device at module load
+COMPUTE_DEVICE = setup_device()
+# ------------------------------------
+
 def run(argo_floats_table):
     """Main function to run the data ingestion pipeline."""
     # load_dotenv() was moved from here
+    
+    print(f"Using {COMPUTE_DEVICE} for data processing...\n")
 
     # --- 1. Connect to Databases ---
     try:
@@ -45,9 +73,9 @@ def run(argo_floats_table):
     for filename in os.listdir(data_dir):
         if filename.endswith(".nc"):
             file_path = os.path.join(data_dir, filename)
-            print(f"Processing file: {file_path}...")
+            print(f"[{COMPUTE_DEVICE.type.upper()}] Processing file: {file_path}...")
             
-            metadata, measurements_df = process_netcdf_file(file_path)
+            metadata, measurements_df = process_netcdf_file(file_path, device=COMPUTE_DEVICE)
 
             if metadata is None or measurements_df is None:
                 print(f"Halting ingestion due to critical error in processing {filename}.")

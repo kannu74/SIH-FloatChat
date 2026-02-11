@@ -1,13 +1,41 @@
 import json
 import operator
 from typing import Annotated, TypedDict, Union, List
+import torch
 
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, END
 
-# 1. Configuration - Optimized for RTX 4050
-# We use a low temperature for SQL and a slightly higher one for Chat
-llm = ChatOllama(model="qwen2.5-coder:7b", temperature=0)
+# --- GPU DETECTION AND SETUP ---
+def setup_gpu_device():
+    """Detect and configure GPU for LLM inference."""
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        device_count = torch.cuda.device_count()
+        print(f"\n{'='*60}")
+        print(f"GPU ACCELERATION ENABLED FOR LLM")
+        print(f"Device: {device_name}")
+        print(f"GPU Count: {device_count}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"{'='*60}\n")
+        return 'cuda'
+    else:
+        print(f"\n{'='*60}")
+        print(f"GPU NOT AVAILABLE - Using CPU for LLM inference")
+        print(f"Note: Ensure Ollama is running with GPU support for optimal performance")
+        print(f"{'='*60}\n")
+        return 'cpu'
+
+compute_device = setup_gpu_device()
+
+# 1. Configuration - Optimized for GPU with Ollama
+# ChatOllama with GPU-enabled model
+llm = ChatOllama(
+    model="qwen2.5-coder:7b",
+    temperature=0,
+    # GPU parameters for Ollama
+    num_gpu=1 if compute_device == 'cuda' else 0,  # Use 1 GPU if available
+)
 
 # 2. Define the State
 class AgentState(TypedDict):
@@ -32,6 +60,7 @@ def intent_router(state: AgentState):
     Question: {state['question']}
     Respond with ONLY the word 'CHAT' or 'DATABASE'."""
     
+    print(f"[{compute_device.upper()}] Routing intent for question: {state['question'][:50]}...")
     classification = llm.invoke(prompt).content.strip().upper()
     # Handle cases where model adds extra text
     intent = "database" if "DATABASE" in classification else "chat"
@@ -45,6 +74,7 @@ def chat_node(state: AgentState):
     Respond naturally and briefly.
     Format: {{"response_type": "text", "answer": "your_response"}}"""
     
+    print(f"[{compute_device.upper()}] Generating chat response...")
     response = llm.invoke(prompt)
     try:
         clean_json = json.loads(response.content.strip())
@@ -65,6 +95,7 @@ def database_node(state: AgentState):
     - Output ONLY valid JSON:
     {{"response_type": "database", "sql_query": "SELECT...", "visualization_type": "..."}}"""
     
+    print(f"[{compute_device.upper()}] Generating SQL query...")
     response = llm.invoke(prompt)
     content = response.content.strip()
     
