@@ -2,13 +2,13 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:latest
+    image: postgres:16-alpine
     container_name: argo-postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: orca_admin
+      POSTGRES_PASSWORD: orca_secure_789
+      POSTGRES_DB: orca_floatchat
     ports:
       - "5432:5432"
     volumes:
