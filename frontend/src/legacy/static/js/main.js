@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+window.initializeApp = function () {
   // Get references to all the necessary HTML elements
   const chatWindow = document.getElementById("chat-window");
   const chatForm = document.getElementById("chat-form");
@@ -438,4 +438,4 @@ const renderScatterPlot = (element, data) => {
 
   // --- Initial Load ---
   loadChats();
-});
+};
