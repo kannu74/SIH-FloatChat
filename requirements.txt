@@ -13,11 +13,17 @@ psycopg2-binary
 chromadb
 sentence-transformers
 
+# GPU/CUDA support (PyTorch)
+torch
+
 # For loading environment variables
 python-dotenv
 
 # Web server for the API
-Flask
+fastapi
+uvicorn[standard]
 
 # Google Gemini AI
 google-generativeai
+langgraph 
+langchain-ollama
