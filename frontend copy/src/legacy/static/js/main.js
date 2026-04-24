@@ -1,5 +1,4 @@
 window.initializeApp = function () {
-  // Get references to all the necessary HTML elements
   const chatWindow = document.getElementById("chat-window");
   const chatForm = document.getElementById("chat-form");
   const messageInput = document.getElementById("message-input");
@@ -11,7 +10,8 @@ window.initializeApp = function () {
   let chatHistory = {};
   let activeChatId = null;
 
-  // --- Core Functions for Chat Management ---
+  // ─── Chat Management ────────────────────────────────────────────────────────
+
   const loadChats = () => {
     chatHistory = JSON.parse(localStorage.getItem("floatChatHistory")) || {};
     const chatIds = Object.keys(chatHistory);
@@ -19,11 +19,8 @@ window.initializeApp = function () {
       startNewChat();
     } else {
       activeChatId =
-        localStorage.getItem("floatChatActiveId") ||
-        chatIds[chatIds.length - 1];
-      if (!chatHistory[activeChatId]) {
-        activeChatId = chatIds[chatIds.length - 1];
-      }
+        localStorage.getItem("floatChatActiveId") || chatIds[chatIds.length - 1];
+      if (!chatHistory[activeChatId]) activeChatId = chatIds[chatIds.length - 1];
       renderChatHistory();
       renderActiveChat();
     }
@@ -52,10 +49,7 @@ window.initializeApp = function () {
 
   const deleteActiveChat = () => {
     const chatIds = Object.keys(chatHistory);
-    if (chatIds.length <= 1) {
-      alert("Cannot delete the last chat.");
-      return;
-    }
+    if (chatIds.length <= 1) { alert("Cannot delete the last chat."); return; }
     if (confirm("Are you sure you want to delete this chat?")) {
       delete chatHistory[activeChatId];
       localStorage.removeItem("floatChatActiveId");
@@ -64,7 +58,8 @@ window.initializeApp = function () {
     }
   };
 
-  // --- Rendering Functions to Display Content ---
+  // ─── Rendering ──────────────────────────────────────────────────────────────
+
   const renderChatHistory = () => {
     chatHistoryEl.innerHTML = "";
     Object.values(chatHistory).forEach((chat) => {
@@ -78,14 +73,11 @@ window.initializeApp = function () {
   };
 
   const renderActiveChat = () => {
-    chatWindow.innerHTML = ""; // Clear previous messages
-
-    // Put the welcome card back if needed
+    chatWindow.innerHTML = "";
     chatWindow.appendChild(welcomeCard);
-
     const activeChat = chatHistory[activeChatId];
     if (activeChat) {
-      activeChat.messages.forEach((msg) => appendMessage(msg.role, msg, false)); // false = don't animate old messages
+      activeChat.messages.forEach((msg) => appendMessage(msg.role, msg, false));
     }
     toggleWelcomeCard();
   };
@@ -117,43 +109,89 @@ window.initializeApp = function () {
     toggleWelcomeCard();
   };
 
+  // ─── Response Rendering ─────────────────────────────────────────────────────
+
   const renderResponse = (element, messageData) => {
-    const { content, sql_query, visualization } = messageData;
+    const { content, sql_query, visualization, language } = messageData;
 
     if (visualization === "text") {
       element.textContent = content;
     } else if (Array.isArray(content) && content.length > 0) {
       const plotContainer = document.createElement("div");
+
       switch (visualization) {
-        case "line_chart":
-          renderLineChart(plotContainer, content);
-          break;
-        case "map":
-          renderMap(plotContainer, content);
-          break;
-        case "scatter_plot":
-          renderScatterPlot(plotContainer, content);
-          break;
-        case 'bar_chart':
-          renderBarChart(plotContainer, content); 
-          break;
-        case 'histogram':
-          renderHistogram(plotContainer, content);
-          break;
-        case 'time_series':
-          renderTimeSeries(plotContainer, content);
-          break;
-        default:
-          plotContainer.appendChild(createTable(content));
-          break;
+        case "line_chart":    renderLineChart(plotContainer, content);    break;
+        case "map":           renderMap(plotContainer, content);          break;
+        case "scatter_plot":  renderScatterPlot(plotContainer, content);  break;
+        case "bar_chart":     renderBarChart(plotContainer, content);     break;
+        case "histogram":     renderHistogram(plotContainer, content);    break;
+        case "time_series":   renderTimeSeries(plotContainer, content);   break;
+        default:              plotContainer.appendChild(createTable(content)); break;
       }
       element.appendChild(plotContainer);
+
+      // ── "Explain this chart" button ──────────────────────────────────────
+      if (visualization !== "table") {
+        const explainBtn = document.createElement("button");
+        explainBtn.classList.add("explain-btn");
+        explainBtn.innerHTML = "🔍 Explain this chart";
+        explainBtn.title = "Ask Orca AI to explain what this visualization shows";
+
+        const explanationBox = document.createElement("div");
+        explanationBox.classList.add("explanation-box");
+        explanationBox.style.display = "none";
+
+        explainBtn.addEventListener("click", async () => {
+          if (explanationBox.style.display !== "none") {
+            // Toggle off
+            explanationBox.style.display = "none";
+            explainBtn.innerHTML = "🔍 Explain this chart";
+            return;
+          }
+
+          explainBtn.disabled = true;
+          explainBtn.innerHTML = "⏳ Analyzing...";
+          explanationBox.style.display = "block";
+          explanationBox.textContent = "Orca AI is analyzing this visualization…";
+
+          try {
+            const resp = await fetch("/api/explain", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                visualization_type: visualization,
+                data: content,
+                sql_query: sql_query || "",
+                language: language || "English"
+              })
+            });
+            const result = await resp.json();
+            if (result.explanation) {
+              explanationBox.textContent = result.explanation;
+            } else {
+              explanationBox.textContent = result.error || "Could not generate an explanation.";
+            }
+            explainBtn.innerHTML = "✕ Hide explanation";
+          } catch (err) {
+            explanationBox.textContent = `Error: ${err.message}`;
+            explainBtn.innerHTML = "🔍 Explain this chart";
+          } finally {
+            explainBtn.disabled = false;
+          }
+        });
+
+        element.appendChild(explainBtn);
+        element.appendChild(explanationBox);
+      }
+      // ── end explain button ───────────────────────────────────────────────
+
     } else if (Array.isArray(content) && content.length === 0) {
       element.textContent = "Query returned no results.";
     } else {
       element.textContent = content;
     }
 
+    // SQL query details disclosure
     if (sql_query) {
       const details = document.createElement("details");
       const summary = document.createElement("summary");
@@ -166,168 +204,156 @@ window.initializeApp = function () {
     }
   };
 
-  // --- Visualization and Table Functions ---
+  // ─── Visualization Functions ─────────────────────────────────────────────────
+
   const renderBarChart = (element, data) => {
-    // Intelligently find which column has text and which has numbers
-    let categoryKey = '';
-    let valueKey = '';
+    let categoryKey = "";
+    let valueKey = "";
     for (const key in data[0]) {
-        if (typeof data[0][key] === 'string') {
-            categoryKey = key;
-        } else if (typeof data[0][key] === 'number') {
-            valueKey = key;
-        }
+      if (typeof data[0][key] === "string") categoryKey = key;
+      else if (typeof data[0][key] === "number") valueKey = key;
     }
-
-    // If we couldn't find the keys, exit gracefully
     if (!categoryKey || !valueKey) {
-        element.textContent = "Could not render bar chart due to unexpected data format.";
-        return;
+      element.textContent = "Could not render bar chart due to unexpected data format.";
+      return;
     }
-
-    const categories = data.map(row => row[categoryKey]);
-    const values = data.map(row => row[valueKey]);
-
     Plotly.newPlot(element, [{
-        x: categories, // Text labels on the x-axis
-        y: values,     // Numerical values on the y-axis
-        type: 'bar',
-        marker: { color: 'cyan' }
+      x: data.map((row) => row[categoryKey]),
+      y: data.map((row) => row[valueKey]),
+      type: "bar",
+      marker: { color: "cyan" }
     }], {
-        title: `Count of Measurements per Project`, // Updated title
-        xaxis: { 
-            title: 'Project Name',
-            tickangle: -45 // Rotate labels to prevent overlap
-        },
-        yaxis: { title: 'Number of Measurements' },
-        margin: { b: 150 }, // Add bottom margin for rotated labels
-        paper_bgcolor: '#2a2a2a',
-        plot_bgcolor: '#2a2a2a',
-        font: { color: '#e0e0e0' }
+      title: "Count of Measurements per Project",
+      xaxis: { title: "Project Name", tickangle: -45 },
+      yaxis: { title: "Number of Measurements" },
+      margin: { b: 150 },
+      paper_bgcolor: "#2a2a2a",
+      plot_bgcolor: "#2a2a2a",
+      font: { color: "#e0e0e0" }
     });
-};
-    const renderHistogram = (element, data) => {
+  };
+
+  const renderHistogram = (element, data) => {
     const key = Object.keys(data[0])[0];
-    const values = data.map(row => row[key]);
-
     Plotly.newPlot(element, [{
-        x: values,
-        type: 'histogram',
-        marker: { 
-            color: 'cyan',
-            // Add a line to create a border around each bar
-            line: {
-                color: '#121212', // A dark color matching the background
-                width: 1
-            }
-        }
+      x: data.map((row) => row[key]),
+      type: "histogram",
+      marker: { color: "cyan", line: { color: "#121212", width: 1 } }
     }], {
-        title: `Distribution of ${key}`,
-        xaxis: { title: key },
-        yaxis: { title: 'Frequency' },
-        paper_bgcolor: '#2a2a2a',
-        plot_bgcolor: '#2a2a2a',
-        font: { color: '#e0e0e0' }
+      title: `Distribution of ${key}`,
+      xaxis: { title: key },
+      yaxis: { title: "Frequency" },
+      paper_bgcolor: "#2a2a2a",
+      plot_bgcolor: "#2a2a2a",
+      font: { color: "#e0e0e0" }
     });
-};
-    const renderTimeSeries = (element, data) => {
-        // Assumes data has 'timestamp' and one other measurement key
-        const valueKey = Object.keys(data[0]).find(k => k !== 'timestamp');
-        const timestamps = data.map(row => row.timestamp);
-        const values = data.map(row => row[valueKey]);
+  };
 
-        Plotly.newPlot(element, [{
-            x: timestamps,
-            y: values,
-            mode: 'lines+markers',
-            type: 'scatter'
-        }], {
-            title: `Trend of ${valueKey} Over Time`,
-            xaxis: { title: 'Timestamp' },
-            yaxis: { title: valueKey },
-            paper_bgcolor: '#2a2a2a',
-            plot_bgcolor: '#2a2a2a',
-            font: { color: '#e0e0e0' }
-        });
-    };
+  const renderTimeSeries = (element, data) => {
+    const valueKey = Object.keys(data[0]).find((k) => k !== "timestamp");
+    Plotly.newPlot(element, [{
+      x: data.map((row) => row.timestamp),
+      y: data.map((row) => row[valueKey]),
+      mode: "lines+markers",
+      type: "scatter"
+    }], {
+      title: `Trend of ${valueKey} Over Time`,
+      xaxis: { title: "Timestamp" },
+      yaxis: { title: valueKey },
+      paper_bgcolor: "#2a2a2a",
+      plot_bgcolor: "#2a2a2a",
+      font: { color: "#e0e0e0" }
+    });
+  };
+
   const renderLineChart = (element, data) => {
     const x_values = data.map((row) => row.temperature ?? row.salinity);
     const y_values = data.map((row) => row.pressure);
     const x_axis_title = data[0].temperature ? "Temperature (°C)" : "Salinity";
-    Plotly.newPlot(
-      element,
-      [{ x: x_values, y: y_values, mode: "lines+markers", type: "scatter" }],
-      {
-        title: `${x_axis_title} Profile`,
-        xaxis: { title: x_axis_title, side: "top" },
-        yaxis: { title: "Pressure (Depth)", autorange: "reversed" },
-        paper_bgcolor: "#2a2a2a",
-        plot_bgcolor: "#2a2a2a",
-        font: { color: "#e0e0e0" },
-      }
-    );
+    Plotly.newPlot(element, [{
+      x: x_values,
+      y: y_values,
+      mode: "lines+markers",
+      type: "scatter"
+    }], {
+      title: `${x_axis_title} Profile`,
+      xaxis: { title: x_axis_title, side: "top" },
+      yaxis: { title: "Pressure (Depth)", autorange: "reversed" },
+      paper_bgcolor: "#2a2a2a",
+      plot_bgcolor: "#2a2a2a",
+      font: { color: "#e0e0e0" }
+    });
   };
 
   const renderMap = (element, data) => {
-    Plotly.newPlot(
-      element,
-      [
-        {
-          type: "scattergeo",
-          lon: data.map((r) => r.longitude),
-          lat: data.map((r) => r.latitude),
-          text: data.map((r) => `Float ID: ${r.float_id || ""}`),
-          mode: "markers",
-          marker: { size: 8, color: "cyan" },
-        },
-      ],
-      {
-        title: "Float Locations",
-        geo: {
-          projection: { type: "natural earth" },
-          bgcolor: "#2a2a2a",
-          landcolor: "#3a3a3a",
-          subunitcolor: "#555",
-        },
-        paper_bgcolor: "#2a2a2a",
-        plot_bgcolor: "#2a2a2a",
-        font: { color: "#e0e0e0" },
-      }
-    );
+    Plotly.newPlot(element, [{
+      type: "scattergeo",
+      lon: data.map((r) => r.longitude),
+      lat: data.map((r) => r.latitude),
+      text: data.map((r) => `Float ID: ${r.float_id || ""}`),
+      mode: "markers",
+      marker: { size: 8, color: "cyan" }
+    }], {
+      title: "Float Locations",
+      geo: {
+        projection: { type: "natural earth" },
+        bgcolor: "#2a2a2a",
+        landcolor: "#3a3a3a",
+        subunitcolor: "#555"
+      },
+      paper_bgcolor: "#2a2a2a",
+      plot_bgcolor: "#2a2a2a",
+      font: { color: "#e0e0e0" }
+    });
   };
 
-  // Find and replace this specific function in your main.js file
-const renderScatterPlot = (element, data) => {
-    // --- CORRECTED, MORE ROBUST CHECK ---
-    // This now checks if the keys exist, which works even if the value is 0.
-    if (!('salinity' in data[0]) || !('temperature' in data[0]) || !('pressure' in data[0])) {
-        element.textContent = "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
-        return;
-    }
-    // ------------------------------------
-
-    const plotData = [{
-        x: data.map((row) => row.salinity),
-        y: data.map((row) => row.temperature),
-        mode: 'markers',
-        type: 'scatter',
-        marker: {
-            color: data.map((row) => row.pressure),
-            colorscale: 'Viridis',
-            showscale: true,
-            colorbar: { title: 'Pressure (Depth)' },
-        },
-    }];
-    const layout = {
-        title: 'Temperature vs. Salinity (T-S Diagram)',
-        xaxis: { title: 'Salinity' },
-        yaxis: { title: 'Temperature (°C)' },
-        paper_bgcolor: '#2a2a2a',
-        plot_bgcolor: '#2a2a2a',
-        font: { color: '#e0e0e0' },
-    };
-    Plotly.newPlot(element, plotData, layout);
+  // const renderScatterPlot = (element, data) => {
+  //   if (!("salinity" in data[0]) || !("temperature" in data[0]) || !("pressure" in data[0])) {
+  //     element.textContent =
+  //       "Error: To create a scatter plot, the data must include salinity, temperature, and pressure.";
+  //     return;
+  //   }
+  //   Plotly.newPlot(element, [{
+  //     x: data.map((row) => row.salinity),
+  //     y: data.map((row) => row.temperature),
+  //     mode: "markers",
+  //     type: "scatter",
+  //     marker: {
+  //       color: data.map((row) => row.pressure),
+  //       colorscale: "Viridis",
+  //       showscale: true,
+  //       colorbar: { title: "Pressure (Depth)" }
+  //     }
+  //   }], {
+  //     title: "Temperature vs. Salinity (T-S Diagram)",
+  //     xaxis: { title: "Salinity" },
+  //     yaxis: { title: "Temperature (°C)" },
+  //     paper_bgcolor: "#2a2a2a",
+  //     plot_bgcolor: "#2a2a2a",
+  //     font: { color: "#e0e0e0" }
+  //   });
+  // };
+ const renderScatterPlot = (element, data) => {
+  if ('temperature' in data[0] && 'pressure' in data[0]) {
+    Plotly.newPlot(element, [{
+      x: data.map((row) => row.temperature),
+      y: data.map((row) => row.pressure),
+      mode: 'markers',
+      type: 'scatter',
+      marker: { color: 'cyan' }
+    }], {
+      title: 'Temperature vs Pressure',
+      xaxis: { title: 'Temperature (°C)' },
+      yaxis: { title: 'Pressure (Depth)', autorange: "reversed" },
+      paper_bgcolor: '#2a2a2a',
+      plot_bgcolor: '#2a2a2a',
+      font: { color: '#e0e0e0' }
+    });
+  } else {
+    element.textContent = "Insufficient data for scatter plot.";
+  }
 };
+
   const createTable = (data) => {
     const table = document.createElement("table");
     const thead = document.createElement("thead");
@@ -357,7 +383,8 @@ const renderScatterPlot = (element, data) => {
     return table;
   };
 
-  // --- Event Handlers ---
+  // ─── Event Handlers ──────────────────────────────────────────────────────────
+
   chatForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const question = messageInput.value.trim();
@@ -377,22 +404,19 @@ const renderScatterPlot = (element, data) => {
 
     const historyForApi = chatHistory[activeChatId].messages
       .slice(0, -1)
-      .map((msg) => {
-        let content =
+      .map((msg) => ({
+        role: msg.role,
+        content:
           typeof msg.content === "string"
             ? msg.content
-            : "User asked for a visualization.";
-        return { role: msg.role, content: content };
-      });
+            : "User asked for a visualization."
+      }));
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: question,
-          chat_history: historyForApi,
-        }),
+        body: JSON.stringify({ question, chat_history: historyForApi })
       });
       chatWindow.removeChild(chatWindow.lastChild);
       if (!response.ok) {
@@ -405,6 +429,7 @@ const renderScatterPlot = (element, data) => {
         content: result.data,
         sql_query: result.sql_query,
         visualization: result.visualization,
+        language: result.language || "English"   // ← store language on message
       };
       chatHistory[activeChatId].messages.push(botMessage);
       appendMessage(botMessage.role, botMessage);
@@ -420,22 +445,15 @@ const renderScatterPlot = (element, data) => {
   newChatBtn.addEventListener("click", startNewChat);
   deleteChatBtn.addEventListener("click", deleteActiveChat);
 
-  // --- Welcome Card Feature ---
+  // ─── Welcome Card ────────────────────────────────────────────────────────────
+
   function toggleWelcomeCard() {
-    // Checks if there are any message elements (excluding the welcome card itself)
     const hasMessages = chatWindow.querySelector(".message");
-    if (welcomeCard) {
-      welcomeCard.style.display = hasMessages ? "none" : "flex";
-    }
+    if (welcomeCard) welcomeCard.style.display = hasMessages ? "none" : "flex";
   }
 
-  // This makes sure the welcome card is shown or hidden when messages are added or removed
-  const observer = new MutationObserver(() => {
-    // We need a small delay to let the DOM update after clearing
-    setTimeout(toggleWelcomeCard, 0);
-  });
+  const observer = new MutationObserver(() => setTimeout(toggleWelcomeCard, 0));
   observer.observe(chatWindow, { childList: true });
 
-  // --- Initial Load ---
   loadChats();
 };
